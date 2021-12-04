@@ -1,6 +1,6 @@
 import uvicorn
 import os
-import os.path   
+import os.path
 from logs import LOGGER
 from fastapi import FastAPI, File, UploadFile
 from starlette.middleware.cors import CORSMiddleware
@@ -15,8 +15,6 @@ from encode import SentenceModel
 from pydantic import BaseModel
 from typing import Optional
 
-
-
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -24,14 +22,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"])
-    
+
 MODEL = SentenceModel()
 MILVUS_CLI = MilvusHelper()
 MYSQL_CLI = MySQLHelper()
 
+
 class Item(BaseModel):
     Table: Optional[str] = None
-    File:str
+    File: str
+
 
 @app.post('/count')
 async def count_text(table_name: str = None):
@@ -68,11 +68,13 @@ async def load_text(file: UploadFile = File(...), table_name: str = None):
         fname_path = os.path.join(os.getcwd(), os.path.join(dirs, fname))
         with open(fname_path, 'wb') as f:
             f.write(text)
-    except Exception :
+    except Exception:
         return {'status': False, 'msg': 'Failed to load data.'}
     # Insert all the image under the file path to Milvus/MySQL
     try:
-        total_num = do_load(table_name, fname_path,MODEL ,MILVUS_CLI, MYSQL_CLI)
+        drop_tables(table_name)
+        total_num = do_load(table_name, fname_path, MODEL, MILVUS_CLI,
+                            MYSQL_CLI)
         LOGGER.info(f"Successfully loaded data, total count: {total_num}")
         return "Successfully loaded data!"
     except Exception as e:
@@ -83,11 +85,12 @@ async def load_text(file: UploadFile = File(...), table_name: str = None):
 @app.get('/search')
 async def do_search_api(table_name: str = None, query_sentence: str = None):
     try:
-        _, title, text, _ = search_in_milvus(table_name,query_sentence,MODEL, MILVUS_CLI, MYSQL_CLI)
+        _, title, text, _ = search_in_milvus(table_name, query_sentence, MODEL,
+                                             MILVUS_CLI, MYSQL_CLI)
         res = []
         for p, d in zip(title, text):
-            dicts = {'title': p, 'content':d}
-            res+=[dicts]
+            dicts = {'title': p, 'content': d}
+            res += [dicts]
         LOGGER.info("Successfully searched similar text!")
         return res
     except Exception as e:
