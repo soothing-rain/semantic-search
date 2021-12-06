@@ -46,10 +46,10 @@ async def count_text(table_name: str = None):
 
 
 @app.post('/drop')
-async def drop_tables(table_name: str = None):
+async def drop_tables(table_name: str = None, is_sentence_table: bool = False):
     # Delete the collection of Milvus and MySQL
     try:
-        status = do_drop(table_name, MILVUS_CLI, MYSQL_CLI)
+        status = do_drop(table_name, MILVUS_CLI, MYSQL_CLI, is_sentence_table)
         LOGGER.info("Successfully drop tables in Milvus and MySQL!")
         return status
     except Exception as e:
@@ -73,8 +73,8 @@ async def load_text(file: UploadFile = File(...), table_name: str = None):
     # Insert all the image under the file path to Milvus/MySQL
     try:
         drop_tables(table_name)
-        total_num = do_load(table_name, fname_path, MODEL, MILVUS_CLI,
-                            MYSQL_CLI)
+        drop_tables(table_name, True)
+        total_num = do_load(table_name, fname_path, MODEL, MILVUS_CLI, MYSQL_CLI)
         LOGGER.info(f"Successfully loaded data, total count: {total_num}")
         return "Successfully loaded data!"
     except Exception as e:
@@ -85,8 +85,7 @@ async def load_text(file: UploadFile = File(...), table_name: str = None):
 @app.get('/search')
 async def do_search_api(table_name: str = None, query_sentence: str = None):
     try:
-        _, title, text, _ = search_in_milvus(table_name, query_sentence, MODEL,
-                                             MILVUS_CLI, MYSQL_CLI)
+        _, title, text, _ = search_in_milvus(table_name, query_sentence, MODEL, MILVUS_CLI, MYSQL_CLI)
         res = []
         for p, d in zip(title, text):
             dicts = {'title': p, 'content': d}

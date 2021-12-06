@@ -27,10 +27,23 @@ class MySQLHelper():
                                         database=MYSQL_DB, local_infile=True)
             self.cursor = self.conn.cursor()
 
-    def create_mysql_table(self, table_name):
+    def create_mysql_sentence_table(self, table_name):
         # Create mysql table if not exists
         self.test_connection()
-        sql = "create table if not exists " + table_name + "(doc_id TEXT, title TEXT ,text TEXT) charset=utf8mb4;"
+        sql = "create table if not exists " + table_name + \
+              "(milvus_id TEXT, is_title INT, sentence TEXT) charset=utf8mb4;"
+        try:
+            self.cursor.execute(sql)
+            LOGGER.debug(f"MYSQL create table: {table_name} with sql: {sql}")
+        except Exception as e:
+            LOGGER.error(f"MYSQL ERROR: {e} with sql: {sql}")
+            sys.exit(1)
+
+    def create_mysql_text_table(self, table_name):
+        # Create mysql table if not exists
+        self.test_connection()
+        sql = "create table if not exists " + table_name + \
+              "(doc_id TEXT, title TEXT ,text TEXT) charset=utf8mb4;"
         try:
             self.cursor.execute(sql)
             LOGGER.debug(f"MYSQL create table: {table_name} with sql: {sql}")
@@ -39,9 +52,22 @@ class MySQLHelper():
             sys.exit(1)
 
     def load_data_to_mysql(self, table_name, data):
-        # Batch insert (doc_ids, img_path) to mysql
+        # Batch insert (doc_id, title, text) to mysql
         self.test_connection()
-        sql = "insert into " + table_name + " (doc_id,title,text) values (%s,%s,%s);"
+        sql = "insert into " + table_name + " (doc_id, title, text) values (%s,%s,%s);"
+        try:
+            self.cursor.executemany(sql, data)
+            self.conn.commit()
+            LOGGER.debug(
+                f"MYSQL loads data to table: {table_name} successfully")
+        except Exception as e:
+            LOGGER.error(f"MYSQL ERROR: {e} with sql: {sql}")
+            sys.exit(1)
+
+    def load_sentence_data_to_mysql(self, table_name, data):
+        # Batch insert (milvus_id, is_title, sentence) to mysql
+        self.test_connection()
+        sql = "insert into " + table_name + " (milvus_id, is_title, sentence) values (%s,%s,%s);"
         try:
             self.cursor.executemany(sql, data)
             self.conn.commit()
@@ -52,7 +78,6 @@ class MySQLHelper():
             sys.exit(1)
 
     def search_by_doc_ids(self, ids, table_name):
-        # Get the img_path according to the milvus ids
         self.test_connection()
         str_ids = str(ids).replace('[', '').replace(']', '')
         sql = "select * from " + table_name + " where doc_id in (" + str_ids + ") order by field (doc_id," + str_ids + ");"
@@ -62,8 +87,24 @@ class MySQLHelper():
             results_id = [res[0] for res in results]
             results_title = [res[1] for res in results]
             results_text = [res[2] for res in results]
-            LOGGER.debug("MYSQL search by milvus id.")
+            LOGGER.debug(f"MYSQL search by doc id. {sql}")
             return results_id, results_title, results_text
+        except Exception as e:
+            LOGGER.error(f"MYSQL ERROR: {e} with sql: {sql}")
+            sys.exit(1)
+
+    def search_by_milvus_ids(self, ids, table_name):
+        self.test_connection()
+        str_ids = str(ids).replace('[', '').replace(']', '')
+        sql = "select * from " + table_name + " where milvus_id in (" + str_ids + ") order by field (milvus_id," + str_ids + ");"
+        try:
+            self.cursor.execute(sql)
+            results = self.cursor.fetchall()
+            results_id = [res[0] for res in results]
+            results_is_title = [res[1] for res in results]
+            results_sentence = [res[2] for res in results]
+            LOGGER.debug(f"MYSQL search by milvus id. {sql}")
+            return results_id, results_is_title, results_sentence
         except Exception as e:
             LOGGER.error(f"MYSQL ERROR: {e} with sql: {sql}")
             sys.exit(1)

@@ -23,36 +23,27 @@ def do_split(data_list, include_original=False):
             split_result.pop()
         if include_original:
             split_result.append(sentence)
-        result.append(split_result)
-
+        new_split = []
+        for split in split_result:
+            split = split.replace(' ', '')
+            if len(split) > 0:
+                new_split.append(split)
+        result.append(new_split)
     return result
 
 
-def process_data(data_list, model, is_title=False):
+def process_data(sentence_list, model, is_title=False):
     doc_id = 0
     doc_id_list = []
     vector_list = []
-    for datum in data_list:
+    for sentence in sentence_list:
         doc_id = doc_id + 1
-        doc_id_list.extend([doc_id] * len(datum))
-        vector_list.extend(model.sentence_encode(datum))
+        doc_id_list.extend([doc_id] * len(sentence))
+        vector_list.extend(model.sentence_encode(sentence))
     is_title_bit = 0
     if is_title:
         is_title_bit = 1
     return [doc_id_list, [is_title_bit] * len(doc_id_list), vector_list]
-
-
-# Get the vector of question
-# def extract_features(file_dir, model):
-#     try:
-#         data = pd.read_csv(file_dir)
-#         title_data = data['title'].tolist()
-#         text_data = data['text'].tolist()
-#         sentence_embeddings = model.sentence_encode(title_data)
-#         return title_data, text_data, sentence_embeddings
-#     except Exception as e:
-#         LOGGER.error(f" Error with extracting feature from question {e}")
-#         sys.exit(1)
 
 
 def create_search_data(file_dir, model):
@@ -60,15 +51,21 @@ def create_search_data(file_dir, model):
         data = pd.read_csv(file_dir)
         title_data_raw = data['title'].tolist()
         text_data_raw = data['text'].tolist()
-        title_data = do_split(title_data_raw, include_original=True)
-        text_data = do_split(text_data_raw)
-        insert_data = process_data(title_data, model, is_title=True)
-        print('dimension = ', len(insert_data[0]), len(insert_data[1]), len(insert_data[2]))
-        insert_text_data = process_data(text_data, model, is_title=False)
-        print('dimension = ', len(insert_text_data[0]), len(insert_text_data[1]), len(insert_text_data[2]))
+        title_data_split = do_split(title_data_raw, include_original=True)
+        text_data_split = do_split(text_data_raw)
+        insert_data = process_data(title_data_split, model, is_title=True)
+        print('# of title data = ', len(insert_data[0]))
+        insert_text_data = process_data(text_data_split, model, is_title=False)
+        print('# of text data = ', len(insert_data[0]))
         for i in range(0, 3):
             insert_data[i].extend(insert_text_data[i])
-        return title_data_raw, text_data_raw, insert_data
+
+        title_data_split.extend(text_data_split)
+        data_split = []
+        for sub_list in title_data_split:
+            for item in sub_list:
+                data_split.append(item)
+        return title_data_raw, text_data_raw, insert_data, data_split
     except Exception as e:
         LOGGER.error(f" Error with extracting feature from question {e}")
         sys.exit(1)
@@ -83,18 +80,44 @@ def format_data(title_data, text_data):
     return data
 
 
+def format_sentence_data(insert_data, data_split):
+    # Combine the id of the vector and the question data into a list
+    data = []
+    for i in range(len(insert_data[0])):
+        value = (insert_data[0][i], insert_data[1][i], data_split[i])
+        data.append(value)
+    return data
+
+
 # Import vectors to Milvus and data to Mysql respectively
 def do_load(collection_name, file_dir, model, milvus_client, mysql_cli):
     if not collection_name:
         collection_name = DEFAULT_TABLE
-    # title_data, text_data, sentence_embeddings = extract_features(file_dir,
-    #                                                               model)
+    sentence_table = collection_name + '_sentence'
 
-    title_data, text_data, insert_data = create_search_data(file_dir, model)
+    title_data, text_data, insert_data, data_split = create_search_data(
+        file_dir, model)
+    # insert_data example:
+    # [ [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    #   [1, 0, 1, 1, 0, 1, 0, 1, 1, 1],
+    #   [
+    #     [0.5104894743768512, 0.6560396299044534, 0.34525940750653883, 0.4907468233957538, 0.026554941012943756],
+    #     [0.315488709152122, 0.5510008407021852, 0.6838450380157629, 0.22215404059303578, 0.5006650456587649],
+    #     [0.8819106302308333, 0.004721144547834566, 0.7264288539867686, 0.8732102299341579, 0.7131052002167416],
+    #     [0.1992932465527999, 0.6494109932323796, 0.38763433760343013, 0.3441007684528695, 0.23724898389646043],
+    #     [0.4447237856781642, 0.07828555514365543, 0.25845219798269303, 0.9404709975001969, 0.3958210799455725]
+    #   ]
+    # ]
     ids = milvus_client.insert(collection_name, insert_data)
     milvus_client.create_index(collection_name)
-    mysql_cli.create_mysql_table(collection_name)
-    mysql_cli.load_data_to_mysql(collection_name, format_data(title_data, text_data))
+    mysql_cli.create_mysql_text_table(collection_name)
+    mysql_cli.create_mysql_sentence_table(sentence_table)
+    mysql_cli.load_data_to_mysql(collection_name,
+                                 format_data(title_data, text_data))
+    insert_data[0] = ids
+    mysql_cli.load_sentence_data_to_mysql(sentence_table,
+                                          format_sentence_data(insert_data,
+                                                               data_split))
     return len(ids)
 
 
@@ -103,6 +126,7 @@ if test:
     port = '19530'
     connections.add_connection(default={"host": host, "port": port})
     connections.connect(alias='default')
+    Collection('test_table').drop()
     print(list_collections())
     dim = 5
     field1 = FieldSchema(name="id", dtype=DataType.INT64,
@@ -131,8 +155,8 @@ if test:
         [[random.random() for _ in range(5)] for _ in range(10)],
     ]
     print("INSERTING...", data)
-    collection.insert(data)
     print(collection.num_entities)
+    milvus_ids = collection.insert(data).primary_keys
 
     query_embedding = [[random.random() for _ in range(5)] for _ in range(1)]
     anns_field = "embedding"

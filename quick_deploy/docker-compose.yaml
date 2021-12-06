@@ -58,13 +58,13 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=123456
     volumes:
-      - /mysqldata:/var/lib/mysql
+      - /Users/username/mysqldata:/var/lib/mysql
     ports:
       - "3308:3306"
 
   webserver:
     container_name: text-search-webserver
-    image: milvusbootcamp/text_search_webserver:1203
+    image: milvusbootcamp/text_search_webserver:your_tag
     networks:
       app_net:
         ipv4_address: 172.16.238.12
