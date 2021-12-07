@@ -2,8 +2,8 @@ import os
 import zipfile
 
 import gdown
+import requests
 from sentence_transformers import SentenceTransformer
-from sklearn.preprocessing import normalize
 
 from config import MODEL_PATH
 
@@ -30,6 +30,12 @@ class SentenceModel:
         self.model = SentenceTransformer(MODEL_PATH)
 
     def sentence_encode(self, data):
-        embedding = self.model.encode(data)
-        sentence_embeddings = normalize(embedding)
-        return sentence_embeddings.tolist()
+        sentence_list = str(data).replace('\'', '\"')
+        payload = "{\"sentences\":" + sentence_list + "}"
+        headers = {
+            'Content-type': 'application/json',
+            'Accept': 'application/json'
+        }
+        r = requests.post('http://encoding-service:port/', headers=headers,
+                          data=payload.encode('utf-8'))
+        return r.json()['message']['vectors']
