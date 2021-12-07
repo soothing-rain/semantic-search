@@ -14,7 +14,7 @@ COPY ./src /app/src
 
 RUN mkdir -p /app/src/models
 
-RUN unzip /app/src/paraphrase-mpnet-base-v2.zip -d /app/src/models/paraphrase-mpnet-base-v2/
+RUN unzip /app/src/paraphrase-multilingual-mpnet-base-v2.zip -d /app/src/models/paraphrase-multilingual-mpnet-base-v2/
 
 
 #RUN pip3 --default-timeout=1000 install Keras==2.3.1  -i https://pypi.tuna.tsinghua.edu.cn/simple
