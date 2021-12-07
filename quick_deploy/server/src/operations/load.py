@@ -21,13 +21,26 @@ def do_split(data_list, include_original=False):
         split_result = re.split('[^a-zA-Z0-9_ 、“”%《》（）〈〉?\w\\-/]', sentence)
         if split_result[-1] == '':
             split_result.pop()
-        if include_original:
-            split_result.append(sentence)
         new_split = []
-        for split in split_result:
-            split = split.replace(' ', '')
-            if len(split) > 0:
-                new_split.append(split)
+        for i in range(len(split_result)):
+            split_sentence = split_result[i].replace(' ', '')
+            if len(split_sentence) > 0:
+                new_split.append(split_sentence)
+            # If split too short. Combine it with previous/next split.
+            if len(split_sentence) < 7:
+                index = i
+                longer_sentence = split_sentence
+                while index > 0 and len(longer_sentence) < 7:
+                    index = index-1
+                    longer_sentence = split_result[index] + longer_sentence
+                new_split.append(longer_sentence)
+                longer_sentence = split_sentence
+                while index < len(split_result)-1 and len(longer_sentence) < 7:
+                    index = index+1
+                    longer_sentence = longer_sentence + split_result[index]
+                new_split.append(longer_sentence)
+        if include_original:
+            new_split.append(sentence)
         result.append(new_split)
     return result
 
@@ -54,9 +67,9 @@ def create_search_data(file_dir, model):
         title_data_split = do_split(title_data_raw, include_original=True)
         text_data_split = do_split(text_data_raw)
         insert_data = process_data(title_data_split, model, is_title=True)
-        print('# of title data = ', len(insert_data[0]))
+        print('# of title data vectors = ', len(insert_data[0]))
         insert_text_data = process_data(text_data_split, model, is_title=False)
-        print('# of text data = ', len(insert_data[0]))
+        print('# of text data vectors = ', len(insert_text_data[0]))
         for i in range(0, 3):
             insert_data[i].extend(insert_text_data[i])
 
