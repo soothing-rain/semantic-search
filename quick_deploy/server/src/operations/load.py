@@ -23,7 +23,7 @@ def do_split(data_list, include_original=False):
             split_result.pop()
         new_split = []
         for i in range(len(split_result)):
-            split_sentence = split_result[i].replace(' ', '')
+            split_sentence = re.sub(' +', ' ', split_result[i])
             if len(split_sentence) > 0:
                 new_split.append(split_sentence)
             # If split too short. Combine it with previous/next split.
@@ -31,12 +31,13 @@ def do_split(data_list, include_original=False):
                 index = i
                 longer_sentence = split_sentence
                 while index > 0 and len(longer_sentence) < 7:
-                    index = index-1
+                    index = index - 1
                     longer_sentence = split_result[index] + longer_sentence
                 new_split.append(longer_sentence)
+                index = i
                 longer_sentence = split_sentence
-                while index < len(split_result)-1 and len(longer_sentence) < 7:
-                    index = index+1
+                while index < len(split_result) - 1 and len(longer_sentence) < 7:
+                    index = index + 1
                     longer_sentence = longer_sentence + split_result[index]
                 new_split.append(longer_sentence)
         if include_original:
