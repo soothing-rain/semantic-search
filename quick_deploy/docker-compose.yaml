@@ -51,6 +51,8 @@ services:
 
   mysql:
     container_name: text-search-mysql
+    # For Apple's M1 chips, add the following line:
+    # platform: linux/x86_64
     image: mysql:5.7
     networks:
       app_net:
@@ -58,11 +60,11 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=123456
     ports:
-      - "3308:3306"
+      - "3306:3306"
 
   webserver:
     container_name: text-search-webserver
-    image: milvusbootcamp/text_search_webserver:put_your_tag
+    image: milvusbootcamp/text_search_webserver:new
     networks:
       app_net:
         ipv4_address: 172.16.238.12
